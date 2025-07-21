@@ -1,0 +1,52 @@
+# Phase 1: Agent Registry Foundation - Additional Dependencies
+# Add these to your existing requirements.txt
+
+# Enhanced database support
+supabase>=2.3.0
+psycopg2-binary>=2.9.0
+
+# Data structures and validation
+pydantic>=2.5.0
+dataclasses-json>=0.6.0
+
+# Enhanced async support
+aiofiles>=23.2.1
+asyncpg>=0.29.0
+
+# Encryption for credentials
+cryptography>=41.0.0
+python-jose>=3.3.0
+
+# Configuration management
+python-dotenv>=1.0.0
+pyyaml>=6.0.1
+
+# Performance monitoring
+prometheus-client>=0.19.0
+psutil>=5.9.0
+
+# Enhanced logging
+structlog>=23.2.0
+colorlog>=6.8.0
+
+# API rate limiting
+ratelimit>=2.2.1
+slowapi>=0.1.9
+
+# Task scheduling and coordination
+APScheduler>=3.10.0
+redis>=5.0.0  # For coordination state
+
+# Enhanced error handling
+tenacity>=8.2.0
+backoff>=2.2.0
+
+# JSON schema validation
+jsonschema>=4.20.0
+
+# UUID utilities
+uuid>=1.30
+
+# Time utilities
+python-dateutil>=2.8.0
+pytz>=2023.3
