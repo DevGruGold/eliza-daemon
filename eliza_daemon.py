@@ -1,197 +1,204 @@
 """
-🦾 Eliza Daemon - Main Orchestration Loop
+🦾 Eliza Daemon - Autonomous Agent for XMRT DAO
 
-Autonomous AI agent that continuously monitors, reasons, and acts for XMRT DAO.
-Runs in 10-minute cycles: Listen → Think → Act → Sleep
+Main orchestration loop that runs Eliza's autonomous decision-making process.
+Listen → Think → Act → Sleep cycle every 10 minutes.
 """
 
 import asyncio
 import logging
 import json
+import os
 from datetime import datetime
-from pathlib import Path
+from typing import Dict, Any
 
 # Import task modules
-from tasks.monitor_twitter import check_new_followers, engage_with_community
-from tasks.monitor_miners import update_miner_stats, check_miner_alerts
-from tasks.handle_rewards import distribute_rewards, calculate_rewards
-from tasks.governance_agent import review_proposals, create_proposals
-from tasks.notify_discord import send_discord_alert
+from tasks.monitor_twitter import TwitterMonitor
+from tasks.monitor_miners import MinerMonitor
+from tasks.handle_rewards import RewardHandler
+from tasks.governance_agent import GovernanceAgent
+from tasks.notify_discord import DiscordNotifier
 
 # Import AI brain
 from agent.langchain_brain import ElizaAgent
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('logs/eliza.log'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger('ElizaDaemon')
+# Import memory system
+from memory.supabase_memory import SupabaseMemory
+
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
 
 class ElizaDaemon:
-    def __init__(self):
-        """Initialize Eliza with AI brain and configuration"""
-        logger.info("🦾 Initializing Eliza Daemon...")
+    """Main Eliza Daemon orchestrator"""
 
-        # Load configuration
-        self.config = self.load_config()
+    def __init__(self, config_path: str = "config.json"):
+        self.config = self._load_config(config_path)
+        self._setup_logging()
 
-        # Initialize AI brain
-        self.eliza = ElizaAgent(self.config)
+        # Initialize components
+        self.eliza_brain = ElizaAgent(self.config)
+        self.memory = SupabaseMemory(self.config)
 
-        # Daemon state
-        self.running = True
-        self.cycle_count = 0
+        # Initialize task modules
+        self.twitter_monitor = TwitterMonitor(self.config)
+        self.miner_monitor = MinerMonitor(self.config)
+        self.reward_handler = RewardHandler(self.config)
+        self.governance_agent = GovernanceAgent(self.config)
+        self.discord_notifier = DiscordNotifier(self.config)
 
-        logger.info("✅ Eliza Daemon initialized successfully!")
+        self.loop_count = 0
 
-    def load_config(self):
-        """Load configuration from config.json"""
+    def _load_config(self, config_path: str) -> Dict[str, Any]:
+        """Load configuration from JSON file"""
         try:
-            with open('config.json', 'r') as f:
+            with open(config_path, 'r') as f:
                 return json.load(f)
         except FileNotFoundError:
-            logger.error("❌ config.json not found! Please copy from config.json.template")
-            raise
-        except json.JSONDecodeError as e:
-            logger.error(f"❌ Invalid JSON in config.json: {e}")
+            logging.error(f"Config file {config_path} not found!")
             raise
 
-    async def listen_phase(self):
-        """Listen: Gather data from all monitoring sources"""
-        logger.info("👂 LISTEN: Gathering data from all sources...")
+    def _setup_logging(self):
+        """Setup logging configuration"""
+        log_level = self.config.get("daemon", {}).get("log_level", "INFO")
+        logging.basicConfig(
+            filename="logs/eliza.log",
+            level=getattr(logging, log_level),
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S"
+        )
 
-        # Gather data concurrently
+        # Also log to console
+        console = logging.StreamHandler()
+        console.setLevel(getattr(logging, log_level))
+        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        console.setFormatter(formatter)
+        logging.getLogger('').addHandler(console)
+
+    async def listen_phase(self) -> Dict[str, Any]:
+        """Phase 1: Listen to all event sources"""
+        logging.info("👂 LISTEN: Gathering information from all sources...")
+
+        # Gather data from all monitoring sources in parallel
         tasks = [
-            check_new_followers(),
-            update_miner_stats(),
-            # Add more monitoring tasks as needed
+            self.twitter_monitor.check_new_activity(),
+            self.miner_monitor.update_miner_stats(),
+            self.governance_agent.check_new_proposals(),
         ]
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        data = {
-            'new_followers': results[0] if not isinstance(results[0], Exception) else [],
-            'miner_stats': results[1] if not isinstance(results[1], Exception) else {},
-            'timestamp': datetime.now().isoformat()
+        gathered_data = {
+            "timestamp": datetime.now().isoformat(),
+            "twitter_activity": results[0] if not isinstance(results[0], Exception) else {},
+            "miner_stats": results[1] if not isinstance(results[1], Exception) else {},
+            "governance_activity": results[2] if not isinstance(results[2], Exception) else {},
         }
 
-        logger.info(f"📊 Data collected: {len(data.get('new_followers', []))} new followers, miner stats updated")
-        return data
+        logging.info(f"📊 Gathered data: {len(str(gathered_data))} chars of information")
+        return gathered_data
 
-    async def think_phase(self, data):
-        """Think: Use AI brain to analyze data and decide actions"""
-        logger.info("🧠 THINK: Analyzing data and making decisions...")
+    async def think_phase(self, gathered_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Phase 2: Process information and make decisions"""
+        logging.info("🧠 THINK: Eliza is analyzing and making decisions...")
 
-        # Store data in memory
-        self.eliza.remember(data)
+        # Store current data in memory
+        await self.memory.store_context("latest_data", gathered_data)
 
-        # Get AI-powered decisions
-        decisions = await self.eliza.decide(data)
+        # Get historical context
+        historical_context = await self.memory.get_recent_context(limit=5)
 
-        logger.info(f"💭 Decisions made: {list(decisions.keys())}")
+        # Let Eliza's brain process everything and decide
+        decisions = await self.eliza_brain.analyze_and_decide(
+            current_data=gathered_data,
+            historical_context=historical_context,
+            loop_count=self.loop_count
+        )
+
+        logging.info(f"💭 Eliza made {len(decisions.get('actions', []))} decisions")
         return decisions
 
-    async def act_phase(self, decisions):
-        """Act: Execute the decisions made by AI brain"""
-        logger.info("⚡ ACT: Executing decisions...")
+    async def act_phase(self, decisions: Dict[str, Any]) -> Dict[str, Any]:
+        """Phase 3: Execute decisions and take actions"""
+        logging.info("⚡ ACT: Executing Eliza's decisions...")
 
-        # Execute actions concurrently where possible
-        action_tasks = []
+        actions_taken = []
 
-        # Handle rewards
-        if 'rewards' in decisions and decisions['rewards']:
-            action_tasks.append(distribute_rewards(decisions['rewards']))
+        # Execute different types of actions
+        if decisions.get("rewards"):
+            result = await self.reward_handler.process_rewards(decisions["rewards"])
+            actions_taken.append({"type": "rewards", "result": result})
 
-        # Handle proposals
-        if 'proposals' in decisions and decisions['proposals']:
-            action_tasks.append(create_proposals(decisions['proposals']))
+        if decisions.get("governance"):
+            result = await self.governance_agent.execute_governance_actions(decisions["governance"])
+            actions_taken.append({"type": "governance", "result": result})
 
-        # Handle community engagement
-        if 'tweets' in decisions and decisions['tweets']:
-            action_tasks.append(engage_with_community(decisions['tweets']))
+        if decisions.get("social"):
+            result = await self.twitter_monitor.execute_social_actions(decisions["social"])
+            actions_taken.append({"type": "social", "result": result})
 
-        # Handle alerts
-        if 'alerts' in decisions and decisions['alerts']:
-            action_tasks.append(send_discord_alert(decisions['alerts']))
+        if decisions.get("notifications"):
+            result = await self.discord_notifier.send_notifications(decisions["notifications"])
+            actions_taken.append({"type": "notifications", "result": result})
 
-        # Execute all actions
-        if action_tasks:
-            results = await asyncio.gather(*action_tasks, return_exceptions=True)
-            success_count = sum(1 for r in results if not isinstance(r, Exception))
-            logger.info(f"✅ {success_count}/{len(action_tasks)} actions completed successfully")
-        else:
-            logger.info("😴 No actions required this cycle")
+        # Store actions taken
+        action_summary = {
+            "timestamp": datetime.now().isoformat(),
+            "loop_count": self.loop_count,
+            "actions_taken": actions_taken,
+            "decisions": decisions
+        }
 
-    async def eliza_cycle(self):
-        """Complete Eliza decision cycle: Listen → Think → Act"""
-        self.cycle_count += 1
-        logger.info(f"🔄 Starting Eliza Cycle #{self.cycle_count}")
+        await self.memory.store_context("actions_taken", action_summary)
 
-        try:
-            # Listen: Gather data
-            data = await self.listen_phase()
+        logging.info(f"✅ Completed {len(actions_taken)} action types")
+        return action_summary
 
-            # Think: Make decisions
-            decisions = await self.think_phase(data)
+    async def eliza_main_loop(self):
+        """Main autonomous loop: Listen → Think → Act → Sleep"""
+        loop_interval = self.config.get("daemon", {}).get("loop_interval_seconds", 600)
 
-            # Act: Execute decisions
-            await self.act_phase(decisions)
+        logging.info("🦾 Eliza Daemon starting autonomous operation...")
+        logging.info(f"⏰ Loop interval: {loop_interval} seconds ({loop_interval/60} minutes)")
 
-            logger.info(f"✅ Cycle #{self.cycle_count} completed successfully")
-
-        except Exception as e:
-            logger.error(f"❌ Error in cycle #{self.cycle_count}: {e}")
-            await send_discord_alert({
-                'type': 'error',
-                'message': f"Eliza Daemon error in cycle #{self.cycle_count}: {str(e)}"
-            })
-
-    async def run(self):
-        """Main daemon loop - runs continuously"""
-        logger.info("🚀 Eliza Daemon starting main loop...")
-
-        while self.running:
+        while True:
             try:
-                await self.eliza_cycle()
+                self.loop_count += 1
+                cycle_start = datetime.now()
 
-                # Sleep for 10 minutes between cycles
-                logger.info("💤 Eliza sleeping for 10 minutes...")
-                await asyncio.sleep(600)  # 10 minutes
+                logging.info(f"\n🔄 === ELIZA CYCLE #{self.loop_count} STARTING ===")
+
+                # Phase 1: Listen
+                gathered_data = await self.listen_phase()
+
+                # Phase 2: Think  
+                decisions = await self.think_phase(gathered_data)
+
+                # Phase 3: Act
+                actions_summary = await self.act_phase(decisions)
+
+                # Calculate cycle time
+                cycle_duration = (datetime.now() - cycle_start).total_seconds()
+
+                logging.info(f"✨ === CYCLE #{self.loop_count} COMPLETE ({cycle_duration:.1f}s) ===\n")
+
+                # Phase 4: Sleep
+                logging.info(f"💤 Eliza sleeping for {loop_interval} seconds...")
+                await asyncio.sleep(loop_interval)
 
             except KeyboardInterrupt:
-                logger.info("⏹️ Shutdown signal received")
-                self.running = False
+                logging.info("🛑 Eliza Daemon stopped by user")
+                break
             except Exception as e:
-                logger.error(f"❌ Unexpected error in main loop: {e}")
+                logging.error(f"❌ Error in main loop: {str(e)}")
+                logging.error(f"🔄 Continuing after error...")
                 await asyncio.sleep(60)  # Wait 1 minute before retrying
-
-        logger.info("👋 Eliza Daemon shutdown complete")
-
-    def stop(self):
-        """Gracefully stop the daemon"""
-        logger.info("🛑 Stopping Eliza Daemon...")
-        self.running = False
 
 async def main():
     """Entry point for Eliza Daemon"""
-    eliza = ElizaDaemon()
-
-    # Handle graceful shutdown
-    import signal
-    def signal_handler(signum, frame):
-        logger.info(f"Received signal {signum}")
-        eliza.stop()
-
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-
-    # Start the daemon
-    await eliza.run()
+    daemon = ElizaDaemon()
+    await daemon.eliza_main_loop()
 
 if __name__ == "__main__":
+    print("🦾 Starting Eliza Daemon...")
     asyncio.run(main())
