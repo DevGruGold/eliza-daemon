@@ -1,63 +1,76 @@
-"""
-💾 Supabase Memory Module
-
-Provides persistent memory storage for Eliza using Supabase database.
-Stores events, decisions, and long-term context for AI reasoning.
-"""
-
+from supabase import create_client, Client
+import os
+import json
+from datetime import datetime
+from dotenv import load_dotenv
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional
 
-logger = logging.getLogger('SupabaseMemory')
+load_dotenv()
+logger = logging.getLogger(__name__)
 
-class SupabaseMemory:
-    def __init__(self, config):
-        """Initialize Supabase memory client"""
-        self.config = config
-        self.events_cache = []
-        self.decisions_cache = []
+class MemoryManager:
+    def __init__(self):
+        url = os.getenv("SUPABASE_URL")
+        key = os.getenv("SUPABASE_KEY")
 
+        if url and key:
+            self.supabase: Client = create_client(url, key)
+            self.connected = True
+        else:
+            logger.warning("Supabase credentials not found, running in memory-only mode")
+            self.connected = False
+            self.local_memory = []
+
+    async def store_decision(self, decision_data: dict):
+        """Store Eliza's decision in persistent memory"""
         try:
-            # Initialize Supabase client
-            from supabase import create_client, Client
-            self.supabase: Client = create_client(
-                config['SUPABASE_URL'],
-                config['SUPABASE_KEY']
-            )
-            logger.info("💾 Supabase memory initialized")
-        except Exception as e:
-            logger.warning(f"⚠️ Supabase not available: {e}")
-            self.supabase = None
+            memory_entry = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "decision_data": json.dumps(decision_data),
+                "reasoning": decision_data.get("reasoning", ""),
+                "actions_taken": len(decision_data.get("rewards", [])) + 
+                              len(decision_data.get("proposals", [])) + 
+                              len(decision_data.get("notifications", []))
+            }
 
-    def store_event(self, event_data: Dict[str, Any]) -> bool:
-        """Store an event in long-term memory"""
+            if self.connected:
+                result = self.supabase.table("eliza_memory").insert(memory_entry).execute()
+                logger.info("💾 Decision stored in Supabase")
+            else:
+                self.local_memory.append(memory_entry)
+                logger.info("💾 Decision stored locally")
+
+        except Exception as e:
+            logger.error(f"Memory storage error: {e}")
+
+    async def recall_recent_decisions(self, limit: int = 10):
+        """Recall recent decisions for context"""
         try:
-            # Store in local cache
-            self.events_cache.append({
-                'timestamp': event_data.get('timestamp', datetime.now().isoformat()),
-                'event_type': event_data.get('type', 'unknown'),
-                'data': event_data.get('data', {}),
-                'context': event_data.get('context', {})
-            })
+            if self.connected:
+                result = self.supabase.table("eliza_memory")\
+                    .select("*")\
+                    .order("timestamp", desc=True)\
+                    .limit(limit)\
+                    .execute()
+                return result.data
+            else:
+                return self.local_memory[-limit:] if self.local_memory else []
 
-            if self.supabase:
-                # TODO: Store in Supabase when configured
-                pass
-
-            logger.info(f"💾 Stored event: {event_data.get('type', 'unknown')}")
-            return True
         except Exception as e:
-            logger.error(f"❌ Error storing event: {e}")
-            return False
-
-    def get_recent_events(self, limit: int = 10, event_type: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Retrieve recent events from memory"""
-        try:
-            # Return from cache for now
-            events = self.events_cache[-limit:] if self.events_cache else []
-            logger.info(f"🔍 Retrieved {len(events)} recent events")
-            return events
-        except Exception as e:
-            logger.error(f"❌ Error retrieving recent events: {e}")
+            logger.error(f"Memory recall error: {e}")
             return []
+
+    async def get_memory_stats(self):
+        """Get statistics about stored memories"""
+        try:
+            if self.connected:
+                result = self.supabase.table("eliza_memory")\
+                    .select("*", count="exact")\
+                    .execute()
+                return {"total_decisions": result.count}
+            else:
+                return {"total_decisions": len(self.local_memory)}
+
+        except Exception as e:
+            logger.error(f"Memory stats error: {e}")
+            return {"total_decisions": 0}
