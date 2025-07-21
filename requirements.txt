@@ -1,10 +1,10 @@
-# Eliza Daemon Dependencies
-langchain>=0.0.350
-openai>=1.0.0
-tweepy>=4.14.0
-supabase>=2.0.0
-python-dotenv>=1.0.0
-apscheduler>=3.10.0
-aiohttp>=3.9.0
-asyncio-mqtt>=0.13.0
-discord-webhook>=1.3.0
+langchain
+openai
+tweepy
+supabase-py
+python-dotenv
+apscheduler
+aiohttp
+asyncio
+requests
+logging
