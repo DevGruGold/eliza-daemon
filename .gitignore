@@ -16,8 +16,6 @@ parts/
 sdist/
 var/
 wheels/
-pip-wheel-metadata/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
@@ -31,19 +29,14 @@ ENV/
 env.bak/
 venv.bak/
 
+# Config
+config.json
+
 # Logs
 logs/*.log
-*.log
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Config with secrets
-config_local.json
