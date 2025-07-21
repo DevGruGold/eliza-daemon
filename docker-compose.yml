@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  eliza-daemon:
+    build: .
+    container_name: eliza-daemon
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs
+      - ./config:/app/config
+    networks:
+      - eliza-network
+
+  # Optional: Redis for caching
+  redis:
+    image: redis:alpine
+    container_name: eliza-redis
+    restart: unless-stopped
+    networks:
+      - eliza-network
+
+networks:
+  eliza-network:
+    driver: bridge
