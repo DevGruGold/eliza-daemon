@@ -1,0 +1,19 @@
+{
+  "daemon": {
+    "loop_interval_seconds": 600,
+    "log_level": "INFO"
+  },
+  "apis": {
+    "twitter_bearer": "REPLACE_WITH_TWITTER_BEARER_TOKEN",
+    "supabase_url": "REPLACE_WITH_SUPABASE_URL", 
+    "supabase_key": "REPLACE_WITH_SUPABASE_ANON_KEY",
+    "xmrt_api": "https://api.xmrt.io/v1/miners",
+    "openai_key": "REPLACE_WITH_OPENAI_API_KEY",
+    "discord_webhook": "REPLACE_WITH_DISCORD_WEBHOOK_URL"
+  },
+  "agent": {
+    "model": "gpt-4",
+    "temperature": 0.7,
+    "max_tokens": 2000
+  }
+}
