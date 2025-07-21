@@ -1,0 +1,102 @@
+{
+  "registry_configuration": {
+    "database": {
+      "connection_pool_size": 10,
+      "query_timeout": 30,
+      "retry_attempts": 3,
+      "backup_frequency": "daily"
+    },
+    "agent_management": {
+      "max_active_agents": 10,
+      "agent_health_check_interval": 300,
+      "performance_tracking_enabled": true,
+      "auto_recovery_enabled": true
+    },
+    "coordination": {
+      "max_coordination_sessions": 5,
+      "session_timeout": 3600,
+      "consensus_threshold": 0.67,
+      "conflict_resolution": "authority_based"
+    },
+    "security": {
+      "encryption_enabled": true,
+      "credential_rotation_days": 30,
+      "access_logging": true,
+      "rate_limiting": {
+        "requests_per_minute": 100,
+        "burst_limit": 150
+      }
+    },
+    "communication": {
+      "platforms": {
+        "twitter": {
+          "enabled": true,
+          "rate_limits": {
+            "posts_per_hour": 50,
+            "interactions_per_hour": 200
+          }
+        },
+        "discord": {
+          "enabled": true,
+          "channels": ["general", "technical", "community", "compliance"]
+        },
+        "whatsapp": {
+          "enabled": false,
+          "business_api_required": true
+        },
+        "email": {
+          "enabled": true,
+          "smtp_config": "from_env"
+        }
+      }
+    },
+    "monitoring": {
+      "metrics_collection": true,
+      "performance_alerts": true,
+      "dashboard_enabled": true,
+      "log_retention_days": 90
+    }
+  },
+  "default_agent_settings": {
+    "response_timeout": 30,
+    "retry_attempts": 3,
+    "context_memory_limit": 1000,
+    "decision_confidence_threshold": 0.7,
+    "escalation_threshold": 8,
+    "coordination_willingness": 0.8
+  },
+  "role_permissions": {
+    "executive": {
+      "can_create_proposals": true,
+      "can_distribute_rewards": true,
+      "can_make_announcements": true,
+      "can_coordinate_meetings": true,
+      "can_override_decisions": true,
+      "authority_level": 9
+    },
+    "technical": {
+      "can_create_proposals": true,
+      "can_distribute_rewards": false,
+      "can_make_announcements": true,
+      "can_coordinate_meetings": true,
+      "can_override_decisions": false,
+      "authority_level": 8
+    },
+    "community": {
+      "can_create_proposals": true,
+      "can_distribute_rewards": true,
+      "can_make_announcements": true,
+      "can_coordinate_meetings": true,
+      "can_override_decisions": false,
+      "authority_level": 7
+    },
+    "compliance": {
+      "can_create_proposals": false,
+      "can_distribute_rewards": false,
+      "can_make_announcements": true,
+      "can_coordinate_meetings": false,
+      "can_override_decisions": true,
+      "authority_level": 8
+    }
+  }
+}
